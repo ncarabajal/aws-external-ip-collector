@@ -34,8 +34,8 @@ It automatically detects which Regions are enabled in your account to avoid API 
 
 1.  **Clone the repository** (or download the script):
     ```bash
-    git clone [https://github.com/YOUR_USERNAME/aws-ip-auditor.git](https://github.com/YOUR_USERNAME/aws-ip-auditor.git)
-    cd aws-ip-auditor
+    git clone [https://github.com/YOUR_USERNAME/aws-external-ip-collector](https://github.com/YOUR_USERNAME/aws-external-ip-collector)
+    cd aws-external-ip-collector
     ```
 
 2.  **Set up a Virtual Environment** (Recommended to keep your system clean):
