@@ -77,4 +77,33 @@ aws_secret_access_key = ...
 
 [marketing]
 aws_access_key_id = AKIA...
-aws_secret_access_key = ...# aws-external-ip-collector
+aws_secret_access_key = ...
+
+### ⚠️ Windows Users Important Note: Ensure your file is named exactly credentials with NO extension. If your file is named credentials.txt, the script will not find it. You may need to enable "View File Extensions" in Windows Explorer to fix this.
+
+##Usage
+Once your virtual environment is active and your credentials are set, simply run:
+
+```
+python aws-external-ip-collector
+```
+
+### Output
+The script generates a file named multi_account_ips.csv in the same folder.
+
+### Columns:
+
+Profile: The name of the profile from your credentials file.
+
+Account ID: The AWS Account Number (prefixed with ' for Excel compatibility).
+
+Region: The AWS Region (e.g., us-east-1).
+
+Service: The detected service type (e.g., ALB/NLB, EC2/Node, CloudFront).
+
+Public IP/Endpoint: The actionable IP address or DNS name.
+
+## Security
+Permissions: The script requires Readonly or SecurityAudit permissions on the target accounts. It performs Describe and List actions only.
+
+Data Safety: This script runs locally on your machine. No data is sent to any third party.
