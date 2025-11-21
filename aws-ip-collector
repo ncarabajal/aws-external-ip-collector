@@ -1,0 +1,156 @@
+import boto3
+import csv
+import sys
+
+# Output filename
+OUTPUT_FILE = 'multi_account_ips.csv'
+
+def get_all_profiles():
+    """Auto-detects all profiles in your ~/.aws/credentials file."""
+    return boto3.session.Session().available_profiles
+
+def get_active_regions(session):
+    """Returns a list of enabled regions for the current session."""
+    try:
+        client = session.client('ec2', region_name='us-east-1')
+        response = client.describe_regions()
+        return [r['RegionName'] for r in response['Regions']]
+    except Exception:
+        return ['us-east-1']
+
+# --- SERVICE SCANNERS ---
+
+def scan_network_interfaces(session, region, profile, account_id, writer):
+    """Scans ENIs (Covers EC2, ELB, RDS, NAT, Fargate)."""
+    print(f"    Checking Network Interfaces (EC2/ELB/NAT/RDS) in {region}...")
+    count = 0
+    try:
+        ec2 = session.client('ec2', region_name=region)
+        paginator = ec2.get_paginator('describe_network_interfaces')
+        for page in paginator.paginate(Filters=[{'Name': 'association.public-ip', 'Values': ['*']}]):
+            for eni in page['NetworkInterfaces']:
+                public_ip = eni.get('Association', {}).get('PublicIp')
+                desc = eni.get('Description', '')
+                
+                # Guess the service type
+                service = "Unknown ENI"
+                if "elb" in desc.lower(): service = "ELB/ALB/NLB"
+                elif "rds" in desc.lower(): service = "RDS"
+                elif "nat" in desc.lower(): service = "NAT Gateway"
+                elif "redshift" in desc.lower(): service = "Redshift Interface"
+                elif "attachment" in eni: service = "EC2/Node"
+                
+                writer.writerow([profile, account_id, region, service, eni['NetworkInterfaceId'], public_ip, desc])
+                count += 1
+        
+        if count > 0:
+            print(f"      -> Found {count} public IPs via ENIs.")
+            
+    except Exception as e: 
+        pass
+
+def scan_lightsail(session, region, profile, account_id, writer):
+    try:
+        ls = session.client('lightsail', region_name=region)
+        # Instances
+        for inst in ls.get_instances().get('instances', []):
+            if inst.get('publicIpAddress'):
+                writer.writerow([profile, account_id, region, 'Lightsail Instance', inst['name'], inst['publicIpAddress'], 'Dynamic/Static IP'])
+        # Static IPs (Reserved)
+        for ip in ls.get_static_ips().get('staticIps', []):
+            writer.writerow([profile, account_id, region, 'Lightsail Static IP', ip['name'], ip['ipAddress'], 'Reserved IP'])
+    except Exception: pass
+
+def scan_apigateway(session, region, profile, account_id, writer):
+    try:
+        # V1 (REST)
+        apig = session.client('apigateway', region_name=region)
+        for api in apig.get_rest_apis().get('items', []):
+             url = f"https://{api['id']}.execute-api.{region}.amazonaws.com"
+             writer.writerow([profile, account_id, region, 'API Gateway (REST)', api['name'], url, f"ID: {api['id']}"])
+        # V2 (HTTP/WebSocket)
+        apig_v2 = session.client('apigatewayv2', region_name=region)
+        for api in apig_v2.get_apis().get('Items', []):
+            writer.writerow([profile, account_id, region, 'API Gateway (HTTP/WS)', api['Name'], api.get('apiEndpoint'), f"ID: {api['ApiId']}"])
+    except Exception: pass
+
+def scan_redshift(session, region, profile, account_id, writer):
+    try:
+        rs = session.client('redshift', region_name=region)
+        paginator = rs.get_paginator('describe_clusters')
+        for page in paginator.paginate():
+            for cluster in page['Clusters']:
+                if cluster.get('PubliclyAccessible') and cluster.get('Endpoint'):
+                    address = cluster['Endpoint']['Address']
+                    writer.writerow([profile, account_id, region, 'Redshift Cluster', cluster['ClusterIdentifier'], address, 'Public Endpoint'])
+    except Exception: pass
+
+def scan_opensearch(session, region, profile, account_id, writer):
+    try:
+        es = session.client('opensearch', region_name=region)
+        for domain in es.list_domain_names()['DomainNames']:
+            name = domain['DomainName']
+            info = es.describe_domain(DomainName=name)['DomainStatus']
+            if info.get('Endpoint'):
+                writer.writerow([profile, account_id, region, 'OpenSearch Domain', name, info['Endpoint'], 'Public Endpoint'])
+    except Exception: pass
+
+def scan_cloudfront(session, profile, account_id, writer):
+    """CloudFront is Global, so we scan it once per account."""
+    print("  Checking CloudFront (Global)...")
+    try:
+        cf = session.client('cloudfront')
+        for page in cf.get_paginator('list_distributions').paginate():
+            if 'Items' in page.get('DistributionList', {}):
+                for dist in page['DistributionList']['Items']:
+                    writer.writerow([profile, account_id, 'Global', 'CloudFront', dist['Id'], dist['DomainName'], 'Global Dist'])
+    except Exception: pass
+
+
+# --- MAIN CONTROLLER ---
+
+def scan_account(profile_name, writer):
+    print(f"\n=== STARTING SCAN: Profile '{profile_name}' ===")
+    try:
+        session = boto3.Session(profile_name=profile_name)
+        sts = session.client('sts')
+        account_id = f"'{sts.get_caller_identity()['Account']}"
+        print(f"  Authenticated as Account ID: {account_id}")
+    except Exception as e:
+        print(f"  [!] Skipping profile '{profile_name}': {str(e)}")
+        return
+
+    # 1. Global Scan
+    scan_cloudfront(session, profile_name, account_id, writer)
+
+    # 2. Regional Scans
+    regions = get_active_regions(session)
+    print(f"  Scanning {len(regions)} active regions: {', '.join(regions)}")
+
+    for region in regions:
+        # print(f"  > Region: {region}") # Optional: Uncomment if you want to see every region name
+        scan_network_interfaces(session, region, profile_name, account_id, writer)
+        scan_lightsail(session, region, profile_name, account_id, writer)
+        scan_apigateway(session, region, profile_name, account_id, writer)
+        scan_redshift(session, region, profile_name, account_id, writer)
+        scan_opensearch(session, region, profile_name, account_id, writer)
+
+def main():
+    profiles = get_all_profiles()
+    if not profiles:
+        print("No profiles found in ~/.aws/credentials.")
+        return
+    
+    print(f"Found profiles: {profiles}")
+    
+    with open(OUTPUT_FILE, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Profile', 'Account ID', 'Region', 'Service', 'ID/Name', 'Public IP/Endpoint', 'Description'])
+
+        for profile in profiles:
+            scan_account(profile, writer)
+
+    print(f"\nAll done! Results in {OUTPUT_FILE}")
+
+if __name__ == "__main__":
+    main()
