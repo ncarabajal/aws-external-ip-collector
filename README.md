@@ -80,9 +80,9 @@ aws_access_key_id = AKIA...
 aws_secret_access_key = ...
 ```
 
-### ⚠️ Windows Users Important Note: Ensure your file is named exactly credentials with NO extension. If your file is named credentials.txt, the script will not find it. You may need to enable "View File Extensions" in Windows Explorer to fix this.
+#### ⚠️ Windows Users Important Note: Ensure your file is named exactly credentials with NO extension. If your file is named credentials.txt, the script will not find it. You may need to enable "View File Extensions" in Windows Explorer to fix this.
 
-##Usage
+## Usage
 Once your virtual environment is active and your credentials are set, simply run:
 
 ```
