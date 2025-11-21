@@ -1,6 +1,6 @@
 # AWS Multi-Account External IP Auditor
 
-A specialized Python utility designed for security teams and network administrators. This tool scans multiple AWS accounts (via AWS Profiles) to discover every public-facing IP address and DNS endpoint in your infrastructure.
+A specialized Python utility designed for security teams and network administrators. This tool scans multiple AWS accounts (via AWS Profiles) to discover every public-facing IP address and DNS endpoint in your infrastructure. Can be used for vulnerability scans, audits, info gathering. 
 
 It utilizes a "Physics-based" scanning approach (enumerating Network Interfaces) to catch resources that standard API calls often miss, such as NAT Gateways, Load Balancers, and Fargate nodes.
 
