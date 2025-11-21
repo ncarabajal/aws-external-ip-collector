@@ -94,17 +94,13 @@ The script generates a file named multi_account_ips.csv in the same folder.
 
 ### Columns:
 
-Profile: The name of the profile from your credentials file.
-
-Account ID: The AWS Account Number (prefixed with ' for Excel compatibility).
-
-Region: The AWS Region (e.g., us-east-1).
-
-Service: The detected service type (e.g., ALB/NLB, EC2/Node, CloudFront).
-
-Public IP/Endpoint: The actionable IP address or DNS name.
+* **Profile:** The name of the profile from your credentials file.
+* **Account ID:** The AWS Account Number (prefixed with ' for Excel compatibility).
+* **Region:** The AWS Region (e.g., us-east-1).
+* **Service:** The detected service type (e.g., ALB/NLB, EC2/Node, CloudFront).
+* **Public IP/Endpoint:** The actionable IP address or DNS name.
 
 ## Security
-Permissions: The script requires Readonly or SecurityAudit permissions on the target accounts. It performs Describe and List actions only.
+**Permissions:** The script requires Readonly or SecurityAudit permissions on the target accounts. It performs Describe and List actions only.
 
-Data Safety: This script runs locally on your machine. No data is sent to any third party.
+**Data Safety:** This script runs locally on your machine. No data is sent to any third party.
